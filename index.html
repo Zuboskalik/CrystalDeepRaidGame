@@ -1,0 +1,44 @@
+﻿<!-- index.html -->
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Подводная Лодка</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="https://yandex.ru/games/sdk/v2"></script>
+</head>
+<body>
+    <div id="game-container">
+        <svg id="game" viewBox="0 0 800 600"></svg>
+        <div id="hud">
+            <div id="fuel">⛽ <span class="value">100</span>%</div>
+            <div id="crystals">💎 <span class="value">0</span></div>
+        </div>
+        <div id="menu">
+            <h1>Подводная Лодка</h1>
+            <button id="start" class="pixel-button">Старт</button>
+            <button id="shop" class="pixel-button">Магазин</button>
+        </div>
+        <div id="revive-menu" class="hidden">
+            <h2>Топливо закончилось!</h2>
+            <button id="revive-ad" class="pixel-button">Смотреть рекламу</button>
+        </div>
+    </div>
+    <div id="shop-menu" class="hidden">
+        <h2>Улучшения</h2>
+        <div class="shop-items">
+            <div class="item" data-type="fuel">
+                <h3>Увеличить бак (+20%)</h3>
+                <button class="pixel-button">💎15</button>
+            </div>
+            <div class="item" data-type="thrust">
+                <h3>Улучшить двигатели</h3>
+                <button class="pixel-button">💎25</button>
+            </div>
+        </div>
+        <button class="pixel-button close">Закрыть</button>
+    </div>
+    <script src="script.js"></script>
+</body>
+</html>

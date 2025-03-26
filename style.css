@@ -1,0 +1,94 @@
+﻿/* style.css */
+@import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+
+body {
+    margin: 0;
+    background: linear-gradient(#000028, #000050);
+    font-family: 'Press Start 2P', cursive;
+    touch-action: none;
+    height: 100vh;
+    overflow: hidden;
+}
+
+#game-container {
+    position: relative;
+    width: 100vw;
+    height: 100vh;
+}
+
+#game {
+    width: 100%;
+    height: 100%;
+}
+
+.submarine {
+    fill: #00ffff;
+    rx: 8px;
+    transition: transform 0.1s;
+}
+
+.resource {
+    font-size: 24px;
+    animation: float 2s infinite;
+    user-select: none;
+}
+
+#hud {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    color: white;
+    font-size: 16px;
+    text-shadow: 2px 2px 2px black;
+}
+
+#menu {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    text-align: center;
+    background: rgba(0,0,0,0.8);
+    padding: 20px;
+    border: 4px solid #00ffff;
+}
+
+.pixel-button {
+    background: #1a1a1a;
+    border: 3px solid #00ffff;
+    color: white;
+    padding: 10px 20px;
+    margin: 10px;
+    font-family: 'Press Start 2P', cursive;
+    cursor: pointer;
+    transition: all 0.1s;
+}
+
+.pixel-button:hover {
+    background: #2a2a2a;
+    transform: scale(1.05);
+}
+
+.pixel-button:active {
+    transform: scale(0.95);
+}
+
+#shop-menu {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: rgba(0,0,0,0.9);
+    padding: 20px;
+    border: 4px solid #ff00ff;
+}
+
+.hidden {
+    display: none !important;
+}
+
+@keyframes float {
+    0% { transform: translateY(0); }
+    50% { transform: translateY(-10px); }
+    100% { transform: translateY(0); }
+}
