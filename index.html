@@ -1,43 +1,68 @@
-﻿<!-- index.html -->
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Подводная Лодка</title>
     <link rel="stylesheet" href="style.css">
     <script src="https://yandex.ru/games/sdk/v2"></script>
 </head>
 <body>
-    <div id="game-container">
-        <svg id="game" viewBox="0 0 800 600"></svg>
-        <div id="hud">
-            <div id="fuel">⛽ <span class="value">100</span>%</div>
-            <div id="crystals">💎 <span class="value">0</span></div>
-        </div>
-        <div id="menu">
-            <h1>Подводная Лодка</h1>
-            <button id="start" class="pixel-button">Старт</button>
-            <button id="shop" class="pixel-button">Магазин</button>
-        </div>
-        <div id="revive-menu" class="hidden">
-            <h2>Топливо закончилось!</h2>
-            <button id="revive-ad" class="pixel-button">Смотреть рекламу</button>
-        </div>
-    </div>
-    <div id="shop-menu" class="hidden">
-        <h2>Улучшения</h2>
-        <div class="shop-items">
-            <div class="item" data-type="fuel">
-                <h3>Увеличить бак (+20%)</h3>
-                <button class="pixel-button">💎15</button>
+    <div id="root">
+        <div id="game-container">
+            <svg id="game" viewBox="0 0 800 600">
+                <!-- Дно океана -->
+                <rect id="sea-floor" x="0" y="580" width="800" height="20" fill="#2a4b6e"/>
+                <!-- Склад -->
+                <rect id="storage" x="370" y="20" width="60" height="40" fill="#666" rx="5"/>
+            </svg>
+            
+            <!-- HUD -->
+            <div id="hud">
+                <div id="fuel">⛽ <span class="value">100</span>%</div>
+                <div id="crystals">💎 <span class="value">0</span></div>
             </div>
-            <div class="item" data-type="thrust">
-                <h3>Улучшить двигатели</h3>
-                <button class="pixel-button">💎25</button>
+
+            <!-- Главное меню -->
+            <div id="main-menu">
+                <h1>Подводная Лодка</h1>
+                <button id="start-btn" class="pixel-button">Старт</button>
+                <button id="shop-btn" class="pixel-button">Магазин</button>
+            </div>
+
+            <!-- Меню паузы -->
+            <div id="pause-overlay" class="hidden">
+                <h2>ПАУЗА</h2>
+                <button class="pixel-button" onclick="togglePause()">Продолжить</button>
+            </div>
+
+            <!-- Меню смерти -->
+            <div id="gameover-overlay" class="hidden">
+                <h2>ТОПЛИВО ЗАКОНЧИЛОСЬ!</h2>
+                <button id="revive-ad" class="pixel-button">Смотреть рекламу</button>
+                <button id="revive-crystals" class="pixel-button">Возродиться (💎<span id="revive-cost">1</span>)</button>
+            </div>
+
+            <!-- Магазин -->
+            <div id="shop-menu" class="hidden">
+                <h2>МАГАЗИН</h2>
+                <div class="shop-item">
+                    <button class="pixel-button buy-upgrade" data-type="capacity">Увеличить грузоподъемность (💎5)</button>
+                </div>
+                <div class="shop-item">
+                    <button class="pixel-button buy-upgrade" data-type="fuel">Пополнить топливо (💎1)</button>
+                </div>
+                <div class="shop-item">
+                    <button class="pixel-button buy-upgrade" data-type="color">Сменить цвет (💎3)</button>
+                </div>
+                <button id="close-shop" class="pixel-button">Закрыть</button>
+            </div>
+
+            <!-- Кнопка покупки топлива около склада -->
+            <div id="fuel-shop" class="hidden">
+                <button class="pixel-button" id="buy-fuel">Купить топливо (💎1)</button>
             </div>
         </div>
-        <button class="pixel-button close">Закрыть</button>
     </div>
     <script src="script.js"></script>
 </body>
