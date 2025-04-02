@@ -1,299 +1,479 @@
 ﻿document.addEventListener('DOMContentLoaded', () => {
-    let yandexGames;
-    let player;
-    let leaderboard;
+    const game = document.getElementById('game');
+    const menu = document.getElementById('menu');
+    const startButton = document.getElementById('start-button');
+    const skinButton = document.getElementById('skin-button');
+    const pauseButton = document.getElementById('pause-button');
+    const scoreDisplay = document.getElementById('score-display');
+    const crystalDisplay = document.getElementById('crystal-display');
+    const fuelDisplay = document.getElementById('fuel-display');
+    const buyFuelButton = document.getElementById('buy-fuel-button');
+    const notification = document.getElementById('notification');
 
+    let yandexSDK;
+    let player;
+    let isPaused = false;
+    let isGameOver = false;
+    let reviveCount = 0;
+    let fuel = 100;
+    let score = 0;
+    let crystals = 0;
+    let maxScore = 0;
+    let currentSkin = 'default';
+    let submarine = {
+        x: 400,
+        y: 300,
+        width: 50,
+        height: 20,
+        velocityY: 0,
+        weight: 1,
+		inventory: { resources: 0, gems: 0 }
+    };
+    let resources = [];
+    let gems = [];
+    let warehouse = {
+        x: 375,
+        y: 0,
+        width: 50,
+        height: 50,
+    };
+    let isLeftPressed = false;
+    let isRightPressed = false;
+    let touchX = 0;
+    let isTouching = false;
+
+    const submarineSkins = [
+        { id: 'default', name: 'Стандарт', price: 0, color: '#555', unlocked: true },
+        { id: 'blue', name: 'Синий', price: 10, color: '#0000FF', unlocked: false },
+        { id: 'red', name: 'Красный', price: 15, color: '#FF0000', unlocked: false },
+    ];
+
+    const upgrades = [
+        { id: 'weight1', name: 'Уменьшение веса 10%', price: 20, weightReduction: 0.1 },
+        { id: 'fuel1', name: 'Эффективность топлива +20%', price: 25, fuelEfficiency: 0.2 },
+    ];
+
+    let appliedUpgrades = [];
+
+    // Инициализация Yandex SDK
     YaGames.init().then(ysdk => {
-        yandexGames = ysdk;
-        ysdk.features.LoadingAPI?.ready();
+        yandexSDK = ysdk;
         ysdk.getPlayer().then(_player => {
             player = _player;
-            loadGameData();
-        }).catch(error => {
-            console.error('Failed to get player:', error);
+            loadProgress();
         });
-        ysdk.getLeaderboards().then(lb => {
-            leaderboard = lb;
-        }).catch(error => {
-            console.error('Failed to get leaderboards:', error);
-        });
-    }).catch(error => {
-        console.error('Yandex SDK initialization failed:', error);
+        ysdk.features.LoadingAPI?.ready();
     });
 
-    let gameState = {
-        running: false,
-        paused: false,
-        fuel: 100,
-        crystals: 0,
-        position: { x: 400, y: 300 },
-        velocity: { x: 0, y: 0 },
-        weight: 1,
-        cargo: 0,
-        capacity: 3,
-        reviveCost: 1,
-        reviveCount: 0,
-        subColor: '#00ffff'
-    };
+    // Обработчики событий
+    startButton.addEventListener('click', () => {
+        menu.style.display = 'none';
+        initGame();
+    });
 
-    // Элементы игры
-    const sub = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-    sub.setAttribute('class', 'submarine');
-    sub.setAttribute('width', '60');
-    sub.setAttribute('height', '30');
-    sub.setAttribute('rx', '8');
-    sub.setAttribute('fill', gameState.subColor);
-    document.getElementById('game').appendChild(sub);
+    skinButton.addEventListener('click', () => {
+        document.getElementById('skin-menu').style.display = 'block';
+        renderSkinMenu();
+    });
 
-    let resources = [];
-    const resourceTypes = ['🔋', '💎'];
-    const RESOURCE_LIFETIME = 5000;
-    const SPAWN_INTERVAL = 3000;
-
-    // Генерация ресурсов
-    function spawnResource() {
-        if (!gameState.running || gameState.paused) return;
-        
-        const type = Math.random() > 0.7 ? resourceTypes[1] : resourceTypes[0];
-        const elem = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-        
-        elem.setAttribute('x', Math.random() * 750 + 25);
-        elem.setAttribute('y', '570');
-        elem.textContent = type;
-        
-        const resource = {
-            elem,
-            type,
-            born: Date.now(),
-            collected: false
-        };
-        
-        document.getElementById('game').appendChild(elem);
-        resources.push(resource);
-        
-        setTimeout(() => {
-            if (!resource.collected) {
-                resource.elem.remove();
-                resources = resources.filter(r => r !== resource);
-            }
-        }, RESOURCE_LIFETIME);
-    }
-
-    // Проверка столкновений
-    function checkCollisions() {
-        resources.forEach((resource, index) => {
-            const rect = resource.elem.getBoundingClientRect();
-            const subRect = sub.getBoundingClientRect();
-            
-            if (
-                rect.left < subRect.right &&
-                rect.right > subRect.left &&
-                rect.top < subRect.bottom &&
-                rect.bottom > subRect.top
-            ) {
-                resource.collected = true;
-                resource.elem.remove();
-                resources = resources.filter(r => r !== resource);
-                
-                if (resource.type === '💎') {
-                    if (gameState.cargo < gameState.capacity) {
-                        gameState.cargo++;
-                        gameState.weight += 0.2;
-                    }
-                } else if (resource.type === '🔋') {
-                    gameState.fuel = Math.min(100, gameState.fuel + 10);
-                }
-            }
-        });
-    }
-
-    // Обновление топлива
-    function updateFuel() {
-        gameState.fuel = Math.max(0, gameState.fuel - 0.02);
-        document.querySelector('#fuel .value').textContent = Math.floor(gameState.fuel);
-        
-        if (gameState.fuel <= 0) {
-            gameState.running = false;
-            document.getElementById('gameover-overlay').classList.remove('hidden');
-            document.getElementById('revive-cost').textContent = gameState.reviveCost;
+    pauseButton.addEventListener('click', () => {
+        if (!isGameOver) {
+            if (isPaused) gameUnPause();
+            else gamePause();
         }
-    }
+    });
 
-    // Игровой цикл
-    const gameLoop = () => {
-        if (!gameState.running || gameState.paused) return;
-
-        // Погружение без нажатий
-        gameState.velocity.y += 0.1 * gameState.weight;
-
-        gameState.position.x += gameState.velocity.x;
-        gameState.position.y += gameState.velocity.y;
-        
-        // Границы
-        gameState.position.x = Math.max(30, Math.min(gameState.position.x, 770));
-        gameState.position.y = Math.max(30, Math.min(gameState.position.y, 560));
-
-        // Обновление позиции
-        sub.setAttribute('x', gameState.position.x - 30);
-        sub.setAttribute('y', gameState.position.y - 15);
-
-        // Проверка склада
-        if (Math.abs(gameState.position.x - 400) < 50 && gameState.position.y < 100) {
-            gameState.crystals += gameState.cargo;
-            gameState.cargo = 0;
-            gameState.weight = 1;
-            document.querySelector('#crystals .value').textContent = gameState.crystals;
-            document.getElementById('fuel-shop').classList.remove('hidden');
+    buyFuelButton.addEventListener('click', () => {
+        if (crystals >= 10) {
+            crystals -= 10;
+            fuel += 50;
+            if (fuel > 100) fuel = 100;
+            updateUI();
+            saveProgress();
         } else {
-            document.getElementById('fuel-shop').classList.add('hidden');
+            showNotification('Недостаточно кристаллов!');
         }
+    });
 
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'ArrowLeft' || e.key.toLowerCase() === 'a') isLeftPressed = true;
+        if (e.key === 'ArrowRight' || e.key.toLowerCase() === 'd') isRightPressed = true;
+    });
+
+    document.addEventListener('keyup', (e) => {
+        if (e.key === 'ArrowLeft' || e.key.toLowerCase() === 'a') isLeftPressed = false;
+        if (e.key === 'ArrowRight' || e.key.toLowerCase() === 'd') isRightPressed = false;
+    });
+
+    document.addEventListener('touchstart', (e) => {
+        isTouching = true;
+        const rect = game.getBoundingClientRect();
+        const scaleX = game.viewBox.baseVal.width / rect.width;
+        touchX = (e.touches[0].clientX - rect.left) * scaleX;
+    });
+
+    document.addEventListener('touchmove', (e) => {
+        const rect = game.getBoundingClientRect();
+        const scaleX = game.viewBox.baseVal.width / rect.width;
+        touchX = (e.touches[0].clientX - rect.left) * scaleX;
+    });
+
+    document.addEventListener('touchend', () => {
+        isTouching = false;
+        isLeftPressed = false;
+        isRightPressed = false;
+    });
+
+    // Функции игры
+    function initGame() {
+		submarine = { 
+			x: 400, 
+			y: 300, 
+			width: 50, 
+			height: 20, 
+			velocityY: 0, 
+			weight: 1, 
+			inventory: { resources: 0, gems: 0 }
+		};
+        resources = [];
+        gems = [];
+        fuel = 100;
+        score = 0;
+        isGameOver = false;
+        reviveCount = 0;
+        pauseButton.style.display = 'block';
+        gameUnPause();
+    }
+
+    function gamePause() {
+        isPaused = true;
+        pauseButton.textContent = '>';
+    }
+
+    function gameUnPause() {
+        isPaused = false;
+        pauseButton.textContent = '⏸';
+        update();
+    }
+
+    function update() {
+		if (isGameOver || isPaused) return;
+
+		// Добавляем гравитацию
+		submarine.velocityY += 0.1;
+
+		// Движение субмарины
+		if (isLeftPressed || (isTouching && touchX < 400)) {
+			submarine.x -= 5; // Движение влево
+			submarine.velocityY -= 0.5; // Подъем вверх
+		}
+		if (isRightPressed || (isTouching && touchX >= 400)) {
+			submarine.x += 5; // Движение вправо
+			submarine.velocityY -= 0.5; // Подъем вверх
+		}
+
+		// Применяем вес с учетом апгрейдов
+		submarine.velocityY += 0.1 * (submarine.weight - appliedUpgrades.reduce((sum, u) => sum + (upgrades.find(up => up.id === u)?.weightReduction || 0), 0));
+		
+		// Обновляем позицию по Y
+		submarine.y += submarine.velocityY;
+
+		// Ограничение по горизонтали
+		submarine.x = Math.max(0, Math.min(submarine.x, 800 - submarine.width));
+
+		// Ограничение по вертикали с обнулением скорости
+		if (submarine.y >= 600 - submarine.height) {
+			submarine.y = 600 - submarine.height; // Упирается в пол
+			submarine.velocityY = 0; // Сбрасываем скорость
+		} else if (submarine.y <= 0) {
+			submarine.y = 0; // Упирается в потолок
+			submarine.velocityY = 0; // Сбрасываем скорость
+		}
+
+        // Расход топлива
+        if (isLeftPressed || isRightPressed || isTouching) { // Топливо тратится только при движении
+			const fuelEfficiency = appliedUpgrades.reduce((sum, u) => sum + (upgrades.find(up => up.id === u)?.fuelEfficiency || 0), 0);
+			fuel -= 0.1 * (1 - fuelEfficiency); // Уменьшаем топливо
+			if (fuel <= 0) gameOver(); // Проверка на окончание топлива
+		}
+
+        // Спавн ресурсов и кристаллов
+		if (Math.random() < 0.005) { // Ресурсы появляются реже
+			const meatEmojis = ['🍖', '🥩', '🍗'];
+			const randomEmoji = meatEmojis[Math.floor(Math.random() * meatEmojis.length)];
+			resources.push({ x: Math.random() * 800, y: 580, type: 'resource', timer: 10000, emoji: randomEmoji });
+		}
+		if (Math.random() < 0.002) { // Кристаллы появляются реже
+			gems.push({ x: Math.random() * 800, y: 580, type: 'gem', timer: 15000 });
+		}
+
+        // Обновление таймеров
+        resources.forEach(r => r.timer -= 16);
+        gems.forEach(g => g.timer -= 16);
+        resources = resources.filter(r => r.timer > 0);
+        gems = gems.filter(g => g.timer > 0);
+
+		resources.forEach(r => {
+			r.y -= 1; // Движение вверх со скоростью 1 пиксель за кадр
+			if (r.y < 0) { // Удаляем, если достигли верха
+				resources = resources.filter(res => res !== r);
+			}
+		});
+		
+        // Проверка столкновений
         checkCollisions();
-        updateFuel();
-        requestAnimationFrame(gameLoop);
-    };
 
-    // Обработчики ввода
-    const handleInput = (e) => {
-        if (!gameState.running || gameState.paused) return;
-        
-        const speed = 5;
-        if (e.key === 'ArrowLeft' || e.key === 'a') {
-            gameState.velocity.x = -speed;
-            gameState.velocity.y = -speed * 0.6;
-        }
-        if (e.key === 'ArrowRight' || e.key === 'd') {
-            gameState.velocity.x = speed;
-            gameState.velocity.y = -speed * 0.6;
-        }
-        if (e.code === 'Space') togglePause();
-    };
+        // Отрисовка
+        drawElements();
 
-    // Запуск игры
-    document.getElementById('start-btn').addEventListener('click', () => {
-        gameState.running = true;
-        document.getElementById('main-menu').classList.add('hidden');
-        setInterval(spawnResource, SPAWN_INTERVAL);
-        gameLoop();
-        spawnResource();
-    });
+        // Обновление UI
+        updateUI();
 
-    // Магазин
-    document.getElementById('shop-btn').addEventListener('click', () => {
-        document.getElementById('shop-menu').classList.remove('hidden');
-    });
+        requestAnimationFrame(update);
+    }
 
-    document.getElementById('close-shop').addEventListener('click', () => {
-        document.getElementById('shop-menu').classList.add('hidden');
-    });
+    function checkCollisions() {
+        resources.forEach((r, index) => {
+			if (submarine.x < r.x + 20 && submarine.x + submarine.width > r.x &&
+				submarine.y < r.y + 20 && submarine.y + submarine.height > r.y) {
+				resources.splice(index, 1);
+				submarine.inventory.resources += 1; // Добавляем в инвентарь
+			}
+		});
 
-    // Покупка улучшений
-    document.querySelectorAll('.buy-upgrade').forEach(button => {
-        button.addEventListener('click', () => {
-            const type = button.getAttribute('data-type');
-            if (type === 'capacity' && gameState.crystals >= 5) {
-                gameState.capacity += 1;
-                gameState.crystals -= 5;
-            } else if (type === 'fuel' && gameState.crystals >= 1) {
-                gameState.fuel = 100;
-                gameState.crystals -= 1;
-            } else if (type === 'color' && gameState.crystals >= 3) {
-                gameState.subColor = gameState.subColor === '#00ffff' ? '#ff00ff' : '#00ffff';
-                sub.setAttribute('fill', gameState.subColor);
-                gameState.crystals -= 3;
-            }
-            document.querySelector('#crystals .value').textContent = gameState.crystals;
+		gems.forEach((g, index) => {
+			if (submarine.x < g.x + 20 && submarine.x + submarine.width > g.x &&
+				submarine.y < g.y + 20 && submarine.y + submarine.height > g.y) {
+				gems.splice(index, 1);
+				submarine.inventory.gems += 1; // Добавляем в инвентарь
+				createFirework(g.x, g.y);
+			}
+		});
+
+        if (submarine.x < warehouse.x + warehouse.width &&
+			submarine.x + submarine.width > warehouse.x &&
+			submarine.y < warehouse.y + warehouse.height &&
+			submarine.y + submarine.height > warehouse.y) {
+			score += submarine.inventory.resources * 10; // Начисляем очки за ресурсы
+			crystals += submarine.inventory.gems; // Начисляем кристаллы
+			showNotification(`Доставлено ${submarine.inventory.resources} ресурсов и ${submarine.inventory.gems} кристаллов`);
+			submarine.inventory = { resources: 0, gems: 0 };
+			submarine.weight = 1;
+		}
+    }
+
+    function drawElements() {
+        document.querySelectorAll('.submarine, .resource, .gem, .warehouse').forEach(el => el.remove());
+
+		const sub = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+		sub.setAttribute('x', submarine.x);
+		sub.setAttribute('y', submarine.y);
+		sub.setAttribute('width', submarine.width);
+		sub.setAttribute('height', submarine.height);
+		sub.setAttribute('fill', submarineSkins.find(s => s.id === currentSkin).color);
+		sub.classList.add('submarine');
+		game.appendChild(sub);
+
+		resources.forEach(r => {
+			const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+			text.setAttribute('x', r.x);
+			text.setAttribute('y', r.y);
+			text.setAttribute('font-size', '20');
+			text.textContent = r.emoji; // Используем эмодзи из объекта ресурса
+			text.classList.add('resource');
+			game.appendChild(text);
+		});
+
+        gems.forEach(g => {
+            const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+            text.setAttribute('x', g.x);
+            text.setAttribute('y', g.y);
+            text.setAttribute('font-size', '20');
+            text.textContent = '💎';
+            text.classList.add('gem');
+            game.appendChild(text);
         });
-    });
 
-    // Покупка топлива около склада
-    document.getElementById('buy-fuel').addEventListener('click', () => {
-        if (gameState.crystals >= 1) {
-            gameState.fuel = 100;
-            gameState.crystals -= 1;
-            document.querySelector('#crystals .value').textContent = gameState.crystals;
-        }
-    });
+        const ware = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+        ware.setAttribute('x', warehouse.x);
+        ware.setAttribute('y', warehouse.y);
+        ware.setAttribute('width', warehouse.width);
+        ware.setAttribute('height', warehouse.height);
+        ware.setAttribute('fill', 'green');
+        ware.classList.add('warehouse');
+        game.appendChild(ware);
+    }
 
-    // Возрождение
-    document.getElementById('revive-ad').addEventListener('click', () => {
-        if (!yandexGames) return;
-        
-        yandexGames.adv.showFullscreenAdv({
-            callbacks: {
-                onClose: (wasShown) => {
-                    if (wasShown) {
-                        gameState.fuel = 100;
-                        document.getElementById('gameover-overlay').classList.add('hidden');
-                        gameState.running = true;
-                        gameLoop();
-                    }
+    function updateUI() {
+        scoreDisplay.textContent = `Очки: ${score}`;
+        crystalDisplay.textContent = `💎 ${crystals}`;
+        fuelDisplay.textContent = `Топливо: ${Math.floor(fuel)}`;
+		document.getElementById('inventory-display').textContent = `Инвентарь: ${submarine.inventory.resources} ресурсов, ${submarine.inventory.gems} кристаллов`;
+    }
+
+    function gameOver() {
+        isGameOver = true;
+        pauseButton.style.display = 'none';
+        menu.innerHTML = `
+            <h1>Игра окончена</h1>
+            <p>Очки: ${score}</p>
+            <p>Рекорд: ${maxScore}</p>
+            <button id="restart-button">Играть снова</button>
+            <button id="revive-button">${reviveCount === 0 ? 'Посмотреть рекламу и ожить' : `Ожить за 💎${reviveCount}`}</button>
+            <button id="skin-shop-button">Настройка внешности</button>
+        `;
+        menu.style.display = 'block';
+
+        document.getElementById('revive-button').addEventListener('click', () => {
+            if (reviveCount === 0) {
+                if (yandexSDK) {
+                    yandexSDK.adv.showRewardedVideo({
+                        callbacks: {
+                            onRewarded: () => {
+                                performRevive();
+                            }
+                        }
+                    });
+                }
+            } else {
+                if (crystals >= reviveCount) {
+                    crystals -= reviveCount;
+                    performRevive();
+                } else {
+                    showNotification('Недостаточно кристаллов!');
                 }
             }
         });
-    });
 
-    document.getElementById('revive-crystals').addEventListener('click', () => {
-        if (gameState.crystals >= gameState.reviveCost) {
-            gameState.crystals -= gameState.reviveCost;
-            gameState.reviveCount++;
-            gameState.reviveCost = gameState.reviveCount + 1;
-            gameState.fuel = 100;
-            document.getElementById('gameover-overlay').classList.add('hidden');
-            document.querySelector('#crystals .value').textContent = gameState.crystals;
-            gameState.running = true;
-            gameLoop();
-        }
-    });
+        document.getElementById('restart-button').addEventListener('click', () => {
+            initGame();
+        });
 
-    // Облачные сохранения
-    function saveGameData() {
-        if (player) {
-            player.setData({
-                crystals: gameState.crystals,
-                capacity: gameState.capacity,
-                subColor: gameState.subColor
-            });
+        document.getElementById('skin-shop-button').addEventListener('click', () => {
+            document.getElementById('skin-menu').style.display = 'block';
+            renderSkinMenu();
+        });
+
+        if (score > maxScore) {
+            maxScore = score;
+            saveProgress();
+            if (yandexSDK) {
+                yandexSDK.getLeaderboards().then(lb => lb.setLeaderboardScore('leaderboardMain', score));
+            }
         }
     }
 
-    function loadGameData() {
-        if (player) {
-            player.getData().then(data => {
-                if (data) {
-                    gameState.crystals = data.crystals || 0;
-                    gameState.capacity = data.capacity || 3;
-                    gameState.subColor = data.subColor || '#00ffff';
-                    sub.setAttribute('fill', gameState.subColor);
-                    document.querySelector('#crystals .value').textContent = gameState.crystals;
-                }
-            });
-        }
+    function performRevive() {
+        reviveCount++;
+        fuel = 100;
+        isGameOver = false;
+        menu.style.display = 'none';
+        update();
     }
 
-    // Лидерборд
-    function updateLeaderboard() {
-        if (leaderboard) {
-            leaderboard.setLeaderboardScore('crystals', gameState.crystals);
-        }
+    function renderSkinMenu() {
+        const skinList = document.querySelector('.skin-list');
+        skinList.innerHTML = '';
+        submarineSkins.concat(upgrades).forEach(item => {
+            const isSkin = 'color' in item;
+            const isEquipped = isSkin && currentSkin === item.id;
+            const isApplied = !isSkin && appliedUpgrades.includes(item.id);
+            const skinEl = document.createElement('div');
+            skinEl.className = `skin-item${isEquipped || isApplied ? ' equipped' : ''}`;
+            skinEl.innerHTML = `
+                <div class="skin-preview" style="background: ${item.color || '#ccc'}"></div>
+                ${!item.unlocked && !isApplied ? `<div class="locked-overlay">🔒</div><div class="skin-price">💎${item.price}</div>` : ''}
+                <button class="skin-button" onclick="${isSkin ? `equipSkin('${item.id}')` : `applyUpgrade('${item.id}')`}">
+                    ${isEquipped || isApplied ? 'Надето' : 'Надеть'}
+                </button>
+            `;
+            if (!item.unlocked && !isApplied) {
+                skinEl.onclick = () => tryBuyItem(item);
+            }
+            skinList.appendChild(skinEl);
+        });
     }
 
-    // Инициализация
-    document.addEventListener('keydown', handleInput);
-    document.addEventListener('keyup', () => {
-        gameState.velocity.x = 0;
-    });
-
-    window.togglePause = () => {
-        gameState.paused = !gameState.paused;
-        document.getElementById('pause-overlay').style.display = 
-            gameState.paused ? 'block' : 'none';
-        if (!gameState.paused) gameLoop();
+    window.equipSkin = function(skinId) {
+        currentSkin = skinId;
+        saveProgress();
+        renderSkinMenu();
     };
 
-    // Периодическое сохранение и обновление лидерборда
-    setInterval(() => {
-        saveGameData();
-        updateLeaderboard();
-    }, 60000); // Каждую минуту
+    window.applyUpgrade = function(upgradeId) {
+        if (!appliedUpgrades.includes(upgradeId)) {
+            appliedUpgrades.push(upgradeId);
+            saveProgress();
+            renderSkinMenu();
+        }
+    };
+
+    function tryBuyItem(item) {
+        if (crystals >= item.price) {
+            crystals -= item.price;
+            item.unlocked = true;
+            saveProgress();
+            renderSkinMenu();
+        } else {
+            showNotification('Недостаточно кристаллов!');
+        }
+    }
+
+    function createFirework(x, y) {
+        const overlay = document.getElementById('firework-overlay');
+        for (let i = 0; i < 20; i++) {
+            const particle = document.createElement('div');
+            particle.className = 'firework-particle';
+            particle.style.left = `${x}px`;
+            particle.style.top = `${y}px`;
+            particle.style.transform = `translate(${Math.random() * 100 - 50}px, ${Math.random() * 100 - 50}px)`;
+            overlay.appendChild(particle);
+            setTimeout(() => particle.remove(), 1000);
+        }
+    }
+
+    function showNotification(message, duration = 2000) {
+        notification.textContent = message;
+        notification.classList.remove('hidden');
+        setTimeout(() => notification.classList.add('hidden'), duration);
+    }
+
+    async function saveProgress() {
+        if (!player) return;
+        const data = {
+            crystals,
+            maxScore,
+            skins: submarineSkins.map(s => ({ id: s.id, unlocked: s.unlocked })),
+            currentSkin,
+            appliedUpgrades
+        };
+        try {
+            await player.setData(data, true);
+        } catch (error) {
+            console.error('Ошибка сохранения:', error);
+        }
+    }
+
+    async function loadProgress() {
+        if (!player) return;
+        try {
+            const data = await player.getData();
+            if (data) {
+                crystals = data.crystals || 0;
+                maxScore = data.maxScore || 0;
+                submarineSkins.forEach(s => {
+                    const savedSkin = data.skins.find(ss => ss.id === s.id);
+                    if (savedSkin) s.unlocked = savedSkin.unlocked;
+                });
+                currentSkin = data.currentSkin || 'default';
+                appliedUpgrades = data.appliedUpgrades || [];
+                updateUI();
+                renderSkinMenu();
+            }
+        } catch (error) {
+            console.error('Ошибка загрузки:', error);
+        }
+    }
+
+    updateUI();
 });
