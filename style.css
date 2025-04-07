@@ -69,6 +69,17 @@ body {
     width: 100%;
 }
 
+#skin-menu button {
+    font-family: 'Press Start 2P', cursive;
+    font-size: 16px;
+    padding: 10px 20px;
+    border: none;
+    cursor: pointer;
+    margin-top: 15px;
+    display: block;
+    width: 100%;
+}
+
 #inventory-display {
     position: absolute;
     bottom: 20px;
@@ -117,28 +128,59 @@ body {
     opacity: 0;
 }
 
-#firework-overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    pointer-events: none;
-    z-index: 9998;
-}
-
-.firework-particle {
-    position: absolute;
-    width: 4px;
-    height: 4px;
-    background: rgba(255, 215, 0, 0.8);
-    border-radius: 50%;
-    animation: explode 1s ease-out forwards;
+#fireworks-container {
+	position: fixed;
+	top: 0;
+	left: 0;
+	width: 100%;
+	height: 100%;
+	pointer-events: none;
+	z-index: 10000;
 }
 
 @keyframes explode {
-    0% { transform: scale(1); opacity: 1; }
-    100% { transform: scale(3); opacity: 0; }
+	0% { 
+		transform: translate(-50%, -50%) scale(0); 
+		opacity: 1; 
+	}
+	50% { 
+		transform: translate(-50%, -50%) scale(1); 
+		opacity: 1; 
+	}
+	100% { 
+		transform: translate(-50%, -50%) scale(1.5); 
+		opacity: 0; 
+	}
+}
+
+@keyframes explode-particle {
+	0% { 
+		transform: translate(-50%, -50%) scale(1) rotate(var(--angle)); 
+		opacity: 1;
+	}
+	100% { 
+		transform: translate(-50%, -50%) 
+			   scale(3) 
+			   rotate(calc(var(--angle) + 720deg)) 
+			   translate(0, 100px);
+		opacity: 0;
+	}
+}
+
+#fireworks-container {
+	pointer-events: none;
+	z-index: 9998; /* Ниже кнопки (z-index: 10) но выше фона */
+}
+
+.firework {
+	position: fixed;
+	top: 50%;
+	left: 50%;
+	animation: explode 1s ease-out;
+	opacity: 0;
+	z-index: 9999;
+	width: 150px;
+	height: 150px;
 }
 
 #score-display, #crystal-display, #fuel-display {
@@ -199,6 +241,17 @@ body {
     gap: 15px;
     padding: 10px 0;
     scroll-snap-type: x mandatory;
+    -webkit-overflow-scrolling: touch; /* Добавлено для iOS */
+    scrollbar-width: thin; /* Для Firefox */
+    overflow-x: scroll; /* Принудительный скролл */
+}
+
+.skin-list::-webkit-scrollbar {
+    height: 8px;
+}
+.skin-list::-webkit-scrollbar-thumb {
+    background: #4CAF50;
+    border-radius: 4px;
 }
 
 .skin-item {

@@ -165,11 +165,11 @@
 		// Движение субмарины
 		if (isLeftPressed || (isTouching && touchX < 400)) {
 			submarine.x -= 5; // Движение влево
-			submarine.velocityY -= 0.5; // Подъем вверх
+			submarine.velocityY -= 0.3; // Подъем вверх
 		}
 		if (isRightPressed || (isTouching && touchX >= 400)) {
 			submarine.x += 5; // Движение вправо
-			submarine.velocityY -= 0.5; // Подъем вверх
+			submarine.velocityY -= 0.3; // Подъем вверх
 		}
 
 		// Применяем вес с учетом апгрейдов
@@ -233,34 +233,48 @@
     }
 
     function checkCollisions() {
-        resources.forEach((r, index) => {
+		// Проверка столкновений с ресурсами
+		resources.forEach((r, index) => {
 			if (submarine.x < r.x + 20 && submarine.x + submarine.width > r.x &&
 				submarine.y < r.y + 20 && submarine.y + submarine.height > r.y) {
 				resources.splice(index, 1);
-				submarine.inventory.resources += 1; // Добавляем в инвентарь
+				submarine.inventory.resources += 1; // Добавляем ресурс в инвентарь
 			}
 		});
 
+		// Проверка столкновений с кристаллами
 		gems.forEach((g, index) => {
 			if (submarine.x < g.x + 20 && submarine.x + submarine.width > g.x &&
 				submarine.y < g.y + 20 && submarine.y + submarine.height > g.y) {
 				gems.splice(index, 1);
-				submarine.inventory.gems += 1; // Добавляем в инвентарь
-				createFirework(g.x, g.y);
+				submarine.inventory.gems += 1; // Добавляем кристалл в инвентарь
+				createFirework(g.x, g.y); // Эффект фейерверка
 			}
 		});
 
-        if (submarine.x < warehouse.x + warehouse.width &&
+		// Проверка доставки на базу
+		if (submarine.x < warehouse.x + warehouse.width &&
 			submarine.x + submarine.width > warehouse.x &&
 			submarine.y < warehouse.y + warehouse.height &&
-			submarine.y + submarine.height > warehouse.y) {
-			score += submarine.inventory.resources * 10; // Начисляем очки за ресурсы
-			crystals += submarine.inventory.gems; // Начисляем кристаллы
-			showNotification(`Доставлено ${submarine.inventory.resources} ресурсов и ${submarine.inventory.gems} кристаллов`);
+			submarine.y + submarine.height > warehouse.y &&
+			(submarine.inventory.resources > 0 || submarine.inventory.gems)) {
+			// Сохраняем значения инвентаря до сброса
+			const deliveredResources = submarine.inventory.resources;
+			const deliveredGems = submarine.inventory.gems;
+			
+			showNotification(`Доставлено 🍖${deliveredResources} и 💎${deliveredGems}`);
+
+			// Сбрасываем инвентарь СРАЗУ после сохранения значений
 			submarine.inventory = { resources: 0, gems: 0 };
+
+			// Начисляем очки и кристаллы
+			score += deliveredResources * 10;
+			crystals += deliveredGems;
+
+			// Выводим уведомление
 			submarine.weight = 1;
 		}
-    }
+	}
 
     function drawElements() {
         document.querySelectorAll('.submarine, .resource, .gem, .warehouse').forEach(el => el.remove());
@@ -307,8 +321,8 @@
     function updateUI() {
         scoreDisplay.textContent = `Очки: ${score}`;
         crystalDisplay.textContent = `💎 ${crystals}`;
-        fuelDisplay.textContent = `Топливо: ${Math.floor(fuel)}`;
-		document.getElementById('inventory-display').textContent = `Инвентарь: ${submarine.inventory.resources} ресурсов, ${submarine.inventory.gems} кристаллов`;
+        fuelDisplay.textContent = `⛽: ${Math.floor(fuel)}`;
+		document.getElementById('inventory-display').textContent = `🎒 🍖x${submarine.inventory.resources} 💎x${submarine.inventory.gems}`;
     }
 
     function gameOver() {
@@ -346,6 +360,7 @@
         });
 
         document.getElementById('restart-button').addEventListener('click', () => {
+			menu.style.display = 'none';
             initGame();
         });
 
@@ -420,16 +435,41 @@
     }
 
     function createFirework(x, y) {
-        const overlay = document.getElementById('firework-overlay');
-        for (let i = 0; i < 20; i++) {
-            const particle = document.createElement('div');
-            particle.className = 'firework-particle';
-            particle.style.left = `${x}px`;
-            particle.style.top = `${y}px`;
-            particle.style.transform = `translate(${Math.random() * 100 - 50}px, ${Math.random() * 100 - 50}px)`;
-            overlay.appendChild(particle);
-            setTimeout(() => particle.remove(), 1000);
-        }
+        const fireworkTemplate = document.getElementById('firework-template');
+        const container = document.getElementById('fireworks-container');
+		container.innerHTML = '';
+
+		// Создаем основной фейерверк
+		const fireworkFragment = document.importNode(fireworkTemplate.content, true);
+		const fireworkElement = fireworkFragment.firstElementChild;
+		
+		// Настройка стилей
+		fireworkElement.style.position = 'fixed';
+		fireworkElement.style.top = '50%';
+		fireworkElement.style.left = '50%';
+		fireworkElement.style.width = '150px';
+		fireworkElement.style.height = '150px';
+		fireworkElement.style.animation = 'explode 1s ease-out';
+
+		// Добавляем частицы
+		for(let i = 0; i < 8; i++) {
+			const particle = document.importNode(fireworkTemplate.content, true);
+			const pElement = particle.firstElementChild;
+			
+			pElement.style.position = 'fixed';
+			pElement.style.top = '50%';
+			pElement.style.left = '50%';
+			pElement.style.width = '80px';
+			pElement.style.height = '80px';
+			pElement.style.animation = `explode-particle ${1}s ease-out`;
+			pElement.style.setProperty('--angle', `${i * 45}deg`);
+			
+			container.appendChild(pElement);
+		}
+
+		container.appendChild(fireworkElement);
+		
+		setTimeout(() => container.innerHTML = '', 1000);
     }
 
     function showNotification(message, duration = 2000) {
