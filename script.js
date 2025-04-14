@@ -554,7 +554,7 @@
 
         // Рубка
         const tower = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-        tower.setAttribute('x', '20');
+        tower.setAttribute('x', '10');
         tower.setAttribute('y', '0');
         tower.setAttribute('width', '10');
         tower.setAttribute('height', '5');
@@ -566,15 +566,22 @@
         porthole1.setAttribute('cx', '10');
         porthole1.setAttribute('cy', '10');
         porthole1.setAttribute('r', '2');
-        porthole1.setAttribute('fill', 'white');
+        porthole1.setAttribute('fill', 'yellow');
         group.appendChild(porthole1);
 
         const porthole2 = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-        porthole2.setAttribute('cx', '40');
+        porthole2.setAttribute('cx', '25');
         porthole2.setAttribute('cy', '10');
         porthole2.setAttribute('r', '2');
-        porthole2.setAttribute('fill', 'white');
+        porthole2.setAttribute('fill', 'lightgreen');
         group.appendChild(porthole2);
+
+        const porthole3 = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+        porthole3.setAttribute('cx', '40');
+        porthole3.setAttribute('cy', '10');
+        porthole3.setAttribute('r', '2');
+        porthole3.setAttribute('fill', 'lightgreen');
+        group.appendChild(porthole3);
 
         return group;
     }
@@ -744,13 +751,22 @@
                 if (food.isCrystal) {
                     crystals++;
                     saveProgress();
-                    createFirework(food.x, food.y);
+                    createFirework();
                     playCrystalSound();
                 } else {
-                    score += 1;
-                    currentHealth = Math.min(maxHealth, currentHealth + 1);
-                    submarine.x = 50 + 350 * (currentHealth - 1) / 14;
-                }
+					const previousHealth = currentHealth;
+					currentHealth = Math.min(maxHealth, currentHealth + 1);
+					
+					if (currentHealth === maxHealth) {
+						score += 2;
+						if (previousHealth < maxHealth) {
+							showNotification(locales[currentLang].maxLength);
+						}
+					} else {
+						score += 1;
+					}
+					submarine.x = 50 + 350 * (currentHealth - 1) / 14;
+				}
                 foods.splice(index, 1);
             }
         });
@@ -965,17 +981,43 @@
         return text;
     }
 
-    function createFirework(x, y) {
-        const overlay = document.getElementById('firework-overlay');
-        for (let i = 0; i < 20; i++) {
-            const particle = document.createElement('div');
-            particle.className = 'firework-particle';
-            particle.style.left = `${x}px`;
-            particle.style.top = `${y}px`;
-            particle.style.transform = `translate(${Math.random() * 100 - 50}px, ${Math.random() * 100 - 50}px)`;
-            overlay.appendChild(particle);
-            setTimeout(() => particle.remove(), 1000);
-        }
+    function createFirework() {
+        const fireworkSVGTemplate = document.getElementById('firework-template');
+		const container = document.getElementById('fireworks-container');
+		container.innerHTML = '';
+
+		// Создаем основной фейерверк
+		const fireworkFragment = document.importNode(fireworkSVGTemplate.content, true);
+		const fireworkElement = fireworkFragment.firstElementChild;
+		
+		// Настройка стилей
+		fireworkElement.style.position = 'fixed';
+		fireworkElement.style.top = '50%';
+		fireworkElement.style.left = '50%';
+		fireworkElement.style.width = '150px';
+		fireworkElement.style.height = '150px';
+		fireworkElement.style.animation = 'explode 1s ease-out';
+
+		// Добавляем частицы
+		for(let i = 0; i < 8; i++) {
+			const particle = document.importNode(fireworkSVGTemplate.content, true);
+			const pElement = particle.firstElementChild;
+			
+			pElement.style.position = 'fixed';
+			pElement.style.top = '50%';
+			pElement.style.left = '50%';
+			pElement.style.width = '80px';
+			pElement.style.height = '80px';
+			pElement.style.animation = `explode-particle ${1}s ease-out`;
+			pElement.style.setProperty('--angle', `${i * 45}deg`);
+			
+			container.appendChild(pElement);
+		}
+
+		container.appendChild(fireworkElement);
+			
+		setTimeout(() => container.innerHTML = '', 1000);
+			
         showNotification(locales[currentLang].crystalCollected, 1000);
     }
 
