@@ -74,7 +74,7 @@
     const game = document.getElementById('game');
     const backgroundOverlay = document.getElementById('background-overlay');
 
-    let isIOS = true;
+    let isIOS = false;
     let animationFrameId;
     let player;
     let yandexSDK;
@@ -118,7 +118,7 @@
     YaGames.init().then(ysdk => {
         yandexSDK = ysdk;
         currentLang = ysdk.environment.i18n?.lang?.startsWith('en') ? 'en' : 'ru';
-        isIOS = true;
+        isIOS = false;
         updateTexts();
         renderSkinMenu();
         updateUI();
