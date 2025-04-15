@@ -33,7 +33,7 @@
             maxLength: "Максимальная энергия! Очки удваиваются!"
         },
         en: {
-            title: "Crystal Deep Raid Game",
+            title: "Deep Raid for Crystals",
             start: "Start",
             skinSettings: "Submarine Skins",
             score: "Score: ",
@@ -648,12 +648,14 @@
 
     function generateObstaclesAndFood() {
         if (Math.random() < 0.02) {
-            obstacles.push({
-                x: 800,
-                y: Math.random() * (600 - 30),
-                width: 30,
-                height: 30
-            });
+			const y = Math.random() * (600 - 30);
+			obstacles.push({
+				x: 800,
+				y: y,
+				width: 30,
+				height: 30,
+				points: generateRockPoints(800 + 15, y + 15)
+			});
         }
         if (Math.random() < 0.015) {
             if (Math.random() < 0.04) {
@@ -671,6 +673,21 @@
             }
         }
     }
+	
+	function generateRockPoints(centerX, centerY) {
+		const points = [];
+		const numVertices = 5 + Math.floor(Math.random() * 4); // 5-8 вершин
+		const radius = 15;
+		
+		for (let i = 0; i < numVertices; i++) {
+			const angle = (i * 2 * Math.PI)/numVertices + (Math.random() - 0.5) * 0.5;
+			const r = radius * (0.7 + Math.random() * 0.6);
+			const px = centerX + r * Math.cos(angle);
+			const py = centerY + r * Math.sin(angle);
+			points.push(`${px},${py}`);
+		}
+		return points.join(' ');
+	}
 
     function pointInTriangle(px, py, x1, y1, x2, y2, x3, y3) {
         function area(x1, y1, x2, y2, x3, y3) {
@@ -946,13 +963,13 @@
         game.appendChild(healthDisplay);
 
         obstacles.forEach(obstacle => {
-            const rock = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
-            rock.setAttribute('points', '0,30 15,0 30,30');
-            rock.setAttribute('fill', 'gray');
-            rock.setAttribute('transform', `translate(${obstacle.x}, ${obstacle.y})`);
-            rock.classList.add('obstacle');
-            game.appendChild(rock);
-        });
+			const rock = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
+			rock.setAttribute('points', obstacle.points);
+			rock.setAttribute('fill', '#5a4d41');
+			rock.setAttribute('transform', `translate(${obstacle.x - 800}, 0)`);
+			rock.classList.add('obstacle');
+			game.appendChild(rock);
+		});
 
         foods.forEach(food => {
             const element = food.isCrystal ? createCrystal(food.x, food.y) : createResource(food.x, food.y);
