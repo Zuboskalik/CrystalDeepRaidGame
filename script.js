@@ -2,6 +2,7 @@
     // Localization object
     const locales = {
         ru: {
+			gameIsLoading: "Игра загружается, пожалуйста, подождите...",
             title: "Глубинный Рейд за Кристаллами",
             start: "Старт",
             skinSettings: "Скины субмарины",
@@ -21,7 +22,7 @@
             playAgain: "ИГРАТЬ СНОВА",
             reviveAd: "Посмотреть рекламу и ожить",
             reviveCrystals: "Ожить за 💎%d",
-            skinShop: "Скины подводной лодки",
+            skinShop: "Скины субмарины",
             equipped: "Надето",
             equip: "Надеть",
             locked: "🔒",
@@ -33,6 +34,7 @@
             maxLength: "Максимальная энергия! Очки удваиваются!"
         },
         en: {
+			gameIsLoading: "Game loading, please wait...",
             title: "Deep Raid for Crystals",
             start: "Start",
             skinSettings: "Submarine Skins",
@@ -86,13 +88,17 @@
     let isDownPressed = false;
     let touchY = 0;
     let isTouching = false;
-    let isPaused = false;
+    let isReady = false;
+    let isPaused = true;
     let totalPausedTime = 0;
     let pauseStartTime = 0;
     let reviveCount = 0;
+	
     let audioContext;
     let bgMusicBuffer;
     let crystalSoundBuffer;
+	let currentPlaybackTime = 0;
+	let musicStartTimestamp = 0;
 
     const submarineSkins = [
         { id: 'default', name: 'Стандарт', type: 'submarine', price: 0, color: 'gray', unlocked: true },
@@ -109,14 +115,16 @@
     let submarine = { x: 100, y: 300, width: 50, height: 20 };
     let submarineGroup;
     let currentHealth = 3;
-    let maxHealth = 15;
+    let maxHealth = 10;
     let healthDisplay;
 
     document.addEventListener('contextmenu', (e) => e.preventDefault());
-
+		
     // Initialize Yandex SDK and determine language
     YaGames.init().then(ysdk => {
+		isReady = true;
         yandexSDK = ysdk;
+        ysdk.features.LoadingAPI?.ready();
         currentLang = ysdk.environment.i18n?.lang?.startsWith('en') ? 'en' : 'ru';
         isIOS = false;
         updateTexts();
@@ -132,8 +140,6 @@
         }).catch(err => {
             console.error('Ошибка при инициализации объекта Player:', err);
         });
-
-        ysdk.features.LoadingAPI?.ready();
 
         ysdk.getPayments({ signed: true }).then(_payments => {
             payments = _payments;
@@ -228,19 +234,30 @@
     }
 
     let bgMusicSource;
-    function playBgMusic() {
-        if (isIOS) return;
-        stopBgMusic();
-        bgMusicSource = audioContext.createBufferSource();
-        bgMusicSource.buffer = bgMusicBuffer;
-        bgMusicSource.loop = true;
-        bgMusicSource.connect(audioContext.destination);
-        bgMusicSource.start();
-    }
+    function playBgMusic(startTime = 0) {
+		if (isIOS || !audioContext || !bgMusicBuffer) return;
+		stopBgMusic();
+		
+		bgMusicSource = audioContext.createBufferSource();
+		bgMusicSource.buffer = bgMusicBuffer;
+		bgMusicSource.loop = true;
+		bgMusicSource.connect(audioContext.destination);
+		
+		// Рассчитываем правильное время для зацикливания
+		const actualStartTime = startTime % bgMusicBuffer.duration;
+		musicStartTimestamp = audioContext.currentTime - actualStartTime;
+		
+		bgMusicSource.start(0, actualStartTime);
+	}
 
     function stopBgMusic() {
-        if (bgMusicSource) bgMusicSource.stop();
-    }
+		if (bgMusicSource) {
+			currentPlaybackTime = audioContext.currentTime - musicStartTimestamp;
+			bgMusicSource.stop();
+			bgMusicSource.disconnect();
+			bgMusicSource = null;
+		}
+	}
 
     function playCrystalSound() {
         if (isIOS) return;
@@ -378,9 +395,10 @@
         unlocked: []
     };
     let isGameOver = false;
+	let isRevived = false;
     let speed = baseSpeed;
 
-    const turnSpeed = 3.5;
+    const turnSpeed = 3;
     const scoreDisplay = document.getElementById('score-display');
     const crystalDisplay = document.getElementById('crystal-display');
 
@@ -445,6 +463,10 @@
     });
 
     startButton.addEventListener('click', () => {
+		if (!isReady) {
+			showNotification(locales[currentLang].gameIsLoading)
+			return;
+		}
         menu.style.display = 'none';
         initGame();
     });
@@ -647,7 +669,7 @@
     }
 
     function generateObstaclesAndFood() {
-        if (Math.random() < 0.02) {
+        if (Math.random() < 0.05) {
 			const y = Math.random() * (600 - 30);
 			obstacles.push({
 				x: 800,
@@ -822,15 +844,43 @@
             }
         }
 
-        menu.innerHTML = `
-            <h1>${locales[currentLang].gameOver}</h1>
-            <p>${locales[currentLang].scoreLabel}${Math.floor(score)}</p>
-            <p>${locales[currentLang].record}${maxScore}</p>
-            ${leaderboardHTML}
-            <button id="restart-button">${locales[currentLang].playAgain}</button>
-            <button id="revive-button">${reviveCount === 0 ? locales[currentLang].reviveAd : locales[currentLang].reviveCrystals.replace('%d', reviveCount)}</button>
-            <button id="skin-shop-button">${locales[currentLang].skinShop}</button>
-        `;
+		const reviveCost = reviveCount === 0 ? 0 : reviveCount;
+		const hasEnoughCrystals = crystals >= reviveCost;
+
+		menu.innerHTML = `
+			<h1>${locales[currentLang].gameOver}</h1>
+			<p>${locales[currentLang].scoreLabel}${Math.floor(score)}</p>
+			<p>${locales[currentLang].record}${maxScore}</p>
+			${leaderboardHTML}
+			<button id="restart-button">${locales[currentLang].playAgain}</button>
+			<button id="revive-button" ${hasEnoughCrystals ? '' : 'disabled'}>
+				${reviveCount === 0 ? locales[currentLang].reviveAd : locales[currentLang].reviveCrystals.replace('%d', reviveCount)}
+			</button>
+			${!hasEnoughCrystals ? `
+				<button id="buy-for-revive" class="buy-gems-mini">
+					${locales[currentLang].buy10.replace('%d', '10')}
+					<img src="images/yan-coin-icon40.png" alt="YAN" style="height: 16px">
+				</button>
+			` : ''}
+			<button id="skin-shop-button">${locales[currentLang].skinShop}</button>
+		`;
+
+		// Добавить обработчик для новой кнопки
+		if (!hasEnoughCrystals) {
+			document.getElementById('buy-for-revive').addEventListener('click', async () => {
+				try {
+					const purchase = await payments.purchase({ id: 'gem10' });
+					await payments.consumePurchase(purchase.purchaseToken);
+					crystals += 10;
+					saveProgress();
+					updateUI();
+					gameOver(); // Перерисовываем меню
+					showNotification(locales[currentLang].notificationSuccess);
+				} catch (err) {
+					showNotification(locales[currentLang].notificationCancel);
+				}
+			});
+		}
 
         document.getElementById('skin-shop-button').addEventListener('click', () => {
             document.getElementById('skin-menu').style.display = 'block';
@@ -848,10 +898,16 @@
                                 gamePause();
                             },
                             onClose: () => {
+								if (isRevived) {
+									performRevive();
+									isRevived = false;
+								} else {
+									gameUnPause();
+								}
                                 console.log("Rewarded закрыт");
                             },
                             onRewarded: () => {
-                                performRevive();
+								isRevived = true;
                             },
                             onError: (error) => {
                                 console.error("Ошибка Rewarded:", error);
@@ -866,6 +922,7 @@
                     saveProgress();
                     updateUI();
                     performRevive();
+					gameUnPause();
                 } else {
                     showNotification(locales[currentLang].notificationNotEnough);
                 }
@@ -883,46 +940,53 @@
     }
 
     function gamePause() {
+		game.classList.add('paused');
         isPaused = true;
         pauseStartTime = Date.now();
         stopBgMusic();
+		if (audioContext) audioContext.suspend();
         pauseButton.textContent = '>';
         console.log('GAME PAUSED');
     }
 
     function gameUnPause() {
+		game.classList.remove('paused');
         totalPausedTime += Date.now() - pauseStartTime;
         isPaused = false;
-        playBgMusic();
+		if (audioContext) {
+			audioContext.resume().then(() => {
+				playBgMusic(currentPlaybackTime);
+			});
+		}
         pauseButton.textContent = '⏸';
         if (!isGameOver) update();
         console.log('GAME RESUMED');
     }
 
-    function performRevive() {
-        pauseButton.style.display = 'block';
-        cancelAnimationFrame(animationFrameId);
-        currentHealth = maxHealth;
-        submarine = { x: 50 + 350 * (currentHealth - 1) / 14, y: 300, width: 50, height: 15 };
-        obstacles = [];
-        foods = [];
-        isGameOver = false;
-        reviveCount++;
-        document.querySelectorAll('.submarine, .obstacle, .food, .health-display').forEach(el => el.remove());
-        submarineGroup = createSubmarineSVG();
-        healthDisplay = createHealthDisplay();
-        const skinConfig = submarineSkins.find(s => s.id === currentSubmarineSkin);
-        applySkinToSubmarine(submarineGroup, skinConfig);
-        game.appendChild(submarineGroup);
-        game.appendChild(healthDisplay);
-        menu.style.display = 'none';
-        updateUI();
-        gameUnPause();
-        gameStartTime = Date.now();
-        totalPausedTime = 0;
-        speed = baseSpeed;
-        showNotification(locales[currentLang].reviveSuccess.replace('%d', reviveCount));
-    }
+	function performRevive() {
+		pauseButton.style.display = 'block';
+		cancelAnimationFrame(animationFrameId);
+		currentHealth = maxHealth;
+		submarine = { x: 50 + 350 * (currentHealth - 1) / 14, y: 300, width: 50, height: 15 };
+		obstacles = [];
+		foods = [];
+		isGameOver = false;
+		reviveCount++;
+		gameStartTime = Date.now();
+		totalPausedTime = 0;
+		speed = baseSpeed;
+		document.querySelectorAll('.submarine, .obstacle, .food, .health-display').forEach(el => el.remove());
+		submarineGroup = createSubmarineSVG();
+		healthDisplay = createHealthDisplay();
+		const skinConfig = submarineSkins.find(s => s.id === currentSubmarineSkin);
+		applySkinToSubmarine(submarineGroup, skinConfig);
+		game.appendChild(submarineGroup);
+		game.appendChild(healthDisplay);
+		menu.style.display = 'none';
+		updateUI();
+		gameUnPause();
+		showNotification(locales[currentLang].reviveSuccess.replace('%d', reviveCount));
+	}
 
     function updateUI() {
         scoreDisplay.textContent = `${locales[currentLang].score}${Math.floor(score)}`;
@@ -935,7 +999,7 @@
     function update() {
         if (isGameOver || isPaused) return;
         const elapsedTime = (Date.now() - gameStartTime - totalPausedTime) / 1000;
-        speed = baseSpeed * (1 + 0.25 * Math.floor(elapsedTime / 20));
+        speed = baseSpeed * (1 + 0.25 * Math.floor(elapsedTime / 10));
         generateObstaclesAndFood();
         if (isUpPressed) submarine.y -= turnSpeed;
         if (isDownPressed) submarine.y += turnSpeed;
