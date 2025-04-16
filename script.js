@@ -643,17 +643,34 @@
         }
     }
 
+    function restartGame() {
+        score = 0;
+        reviveCount = 0;
+        initGame();
+    }
+
+	function performRevive() {
+		initGame();
+		
+		menu.style.display = 'none';
+		
+		reviveCount++;		
+		showNotification(locales[currentLang].reviveSuccess.replace('%d', reviveCount));
+	}
+
     function initGame() {
+        pauseButton.style.display = 'block';
         cancelAnimationFrame(animationFrameId);
         playBgMusic();
-        currentHealth = 3;
+		
+        currentHealth = Math.floor(maxHealth / 2);
         submarine = { x: 50 + 350 * (currentHealth - 1) / 14, y: 300, width: 50, height: 15 };
         obstacles = [];
         foods = [];
-        score = 0;
         isGameOver = false;
-        reviveCount = 0;
         initSkins();
+		
+		document.querySelectorAll('.submarine, .obstacle, .food, .health-display').forEach(el => el.remove());
         submarineGroup = createSubmarineSVG();
         healthDisplay = createHealthDisplay();
         const skinConfig = submarineSkins.find(s => s.id === currentSubmarineSkin);
@@ -661,7 +678,7 @@
         game.appendChild(submarineGroup);
         game.appendChild(healthDisplay);
         updateUI();
-        pauseButton.style.display = 'block';
+		
         gameUnPause();
         gameStartTime = Date.now();
         totalPausedTime = 0;
@@ -812,40 +829,41 @@
     }
 
     async function gameOver() {
-        gamePause();
-        pauseButton.style.display = 'none';
-        cancelAnimationFrame(animationFrameId);
-        isGameOver = true;
-        let leaderboardScore = Math.floor(score);
-        if (score > maxScore) {
-            maxScore = score;
-            saveProgress();
-            if (yandexSDK) {
-                try {
-                    await yandexSDK.getLeaderboards().then(lb => lb.setLeaderboardScore('leaderboardMain', score));
-                } catch (e) {
-                    console.log('Оффлайн режим, результат не сохранён');
-                }
-            }
-        }
+		gamePause();
+		pauseButton.style.display = 'none';
+		cancelAnimationFrame(animationFrameId);
+		isGameOver = true;
+		let leaderboardScore = Math.floor(score);
+		if (score > maxScore) {
+			maxScore = score;
+			saveProgress();
+			if (yandexSDK) {
+				try {
+					await yandexSDK.getLeaderboards().then(lb => lb.setLeaderboardScore('leaderboardMain', score));
+				} catch (e) {
+					console.log('Оффлайн режим, результат не сохранён');
+				}
+			}
+		}
 
-        let leaderboardHTML = '';
-        if (yandexSDK) {
-            try {
-                const lb = await yandexSDK.getLeaderboards();
-                const entries = await lb.getLeaderboardEntries('leaderboardMain', { quantityTop: 20, includeUser: true, quantityAround: 10 });
-                const playerEntry = entries.entries.find(e => e.player.uniqueID === player.getUniqueID());
-                if (playerEntry) {
-                    const trophy = playerEntry.rank < 2 ? '!!!🏆!!!' : (playerEntry.rank <= 3 ? '🏆' : '');
-                    leaderboardHTML = `<p>${locales[currentLang].placeInWorld}${playerEntry.rank}${trophy}</p>`;
-                }
-            } catch (error) {
-                console.log('Не удалось получить данные лидерборда:', error);
-            }
-        }
+		let leaderboardHTML = '';
+		if (yandexSDK) {
+			try {
+				const lb = await yandexSDK.getLeaderboards();
+				const entries = await lb.getLeaderboardEntries('leaderboardMain', { quantityTop: 20, includeUser: true, quantityAround: 10 });
+				const playerEntry = entries.entries.find(e => e.player.uniqueID === player.getUniqueID());
+				if (playerEntry) {
+					const trophy = playerEntry.rank < 2 ? '!!!🏆!!!' : (playerEntry.rank <= 3 ? '🏆' : '');
+					leaderboardHTML = `<p>${locales[currentLang].placeInWorld}${playerEntry.rank}${trophy}</p>`;
+				}
+			} catch (error) {
+				console.log('Не удалось получить данные лидерборда:', error);
+			}
+		}
 
 		const reviveCost = reviveCount === 0 ? 0 : reviveCount;
 		const hasEnoughCrystals = crystals >= reviveCost;
+		const gem10Product = productsCache.find(p => p.id === 'gem10');
 
 		menu.innerHTML = `
 			<h1>${locales[currentLang].gameOver}</h1>
@@ -858,14 +876,16 @@
 			</button>
 			${!hasEnoughCrystals ? `
 				<button id="buy-for-revive" class="buy-gems-mini">
-					${locales[currentLang].buy10.replace('%d', '10')}
-					<img src="images/yan-coin-icon40.png" alt="YAN" style="height: 16px">
+					${gem10Product ? 
+						locales[currentLang].buy10
+							.replace('%d', gem10Product.priceValue) 
+							+ `<img src="${gem10Product.getPriceCurrencyImage()}" alt="${gem10Product.priceCurrencyCode}" style="height: 16px">`
+						: '10💎 / 50 YAN'}
 				</button>
 			` : ''}
 			<button id="skin-shop-button">${locales[currentLang].skinShop}</button>
 		`;
 
-		// Добавить обработчик для новой кнопки
 		if (!hasEnoughCrystals) {
 			document.getElementById('buy-for-revive').addEventListener('click', async () => {
 				try {
@@ -882,62 +902,68 @@
 			});
 		}
 
-        document.getElementById('skin-shop-button').addEventListener('click', () => {
-            document.getElementById('skin-menu').style.display = 'block';
-            renderSkinMenu();
-        });
+		document.getElementById('skin-shop-button').addEventListener('click', () => {
+			document.getElementById('skin-menu').style.display = 'block';
+			renderSkinMenu();
+		});
 
-        const reviveButton = document.getElementById('revive-button');
-        reviveButton.addEventListener('click', () => {
-            if (reviveCount === 0) {
-                if (yandexSDK) {
-                    yandexSDK.adv.showRewardedVideo({
-                        callbacks: {
-                            onOpen: () => {
-                                console.log("Rewarded открыт");
-                                gamePause();
-                            },
-                            onClose: () => {
+		const reviveButton = document.getElementById('revive-button');
+		reviveButton.addEventListener('click', () => {
+			if (reviveCount === 0) {
+				if (yandexSDK) {
+					yandexSDK.adv.showRewardedVideo({
+						callbacks: {
+							onOpen: () => {
+								console.log("Rewarded открыт");
+								gamePause();
+							},
+							onClose: () => {
 								if (isRevived) {
 									performRevive();
 									isRevived = false;
 								} else {
 									gameUnPause();
 								}
-                                console.log("Rewarded закрыт");
-                            },
-                            onRewarded: () => {
+								console.log("Rewarded закрыт");
+							},
+							onRewarded: () => {
 								isRevived = true;
-                            },
-                            onError: (error) => {
-                                console.error("Ошибка Rewarded:", error);
-                            }
-                        }
-                    });
-                }
-            } else {
-                const cost = reviveCount;
-                if (crystals >= cost) {
-                    crystals -= cost;
-                    saveProgress();
-                    updateUI();
-                    performRevive();
+							},
+							onError: (error) => {
+								console.error("Ошибка Rewarded:", error);
+							}
+						}
+					});
+				}
+			} else {
+				const cost = reviveCount;
+				if (crystals >= cost) {
+					crystals -= cost;
+					saveProgress();
+					updateUI();
+					performRevive();
 					gameUnPause();
-                } else {
-                    showNotification(locales[currentLang].notificationNotEnough);
-                }
-            }
-        });
+				} else {
+					showNotification(locales[currentLang].notificationNotEnough);
+				}
+			}
+		});
 
-        document.getElementById('restart-button').addEventListener('click', () => {
-            if (Date.now() - lastAdShownTime > 60000 && yandexSDK) showAd();
-            menu.style.display = 'none';
-            initGame();
-        });
+		document.getElementById('restart-button').addEventListener('click', () => {
+			menu.style.display = 'none';
+			restartGame();
+			gamePause();
+			if (Date.now() - lastAdShownTime > 60000 && yandexSDK) 
+			{
+				showAd();
+			} else {
+				gameUnPause();
+			}
+		});
 
-        menu.style.display = 'block';
-        updateUI();
-    }
+		menu.style.display = 'block';
+		updateUI();
+	}
 
     function gamePause() {
 		game.classList.add('paused');
@@ -962,31 +988,6 @@
         if (!isGameOver) update();
         console.log('GAME RESUMED');
     }
-
-	function performRevive() {
-		pauseButton.style.display = 'block';
-		cancelAnimationFrame(animationFrameId);
-		currentHealth = maxHealth;
-		submarine = { x: 50 + 350 * (currentHealth - 1) / 14, y: 300, width: 50, height: 15 };
-		obstacles = [];
-		foods = [];
-		isGameOver = false;
-		reviveCount++;
-		gameStartTime = Date.now();
-		totalPausedTime = 0;
-		speed = baseSpeed;
-		document.querySelectorAll('.submarine, .obstacle, .food, .health-display').forEach(el => el.remove());
-		submarineGroup = createSubmarineSVG();
-		healthDisplay = createHealthDisplay();
-		const skinConfig = submarineSkins.find(s => s.id === currentSubmarineSkin);
-		applySkinToSubmarine(submarineGroup, skinConfig);
-		game.appendChild(submarineGroup);
-		game.appendChild(healthDisplay);
-		menu.style.display = 'none';
-		updateUI();
-		gameUnPause();
-		showNotification(locales[currentLang].reviveSuccess.replace('%d', reviveCount));
-	}
 
     function updateUI() {
         scoreDisplay.textContent = `${locales[currentLang].score}${Math.floor(score)}`;
