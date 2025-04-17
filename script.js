@@ -89,6 +89,7 @@
     let touchY = 0;
     let isTouching = false;
     let isReady = false;
+    let isStarted = false;
     let isPaused = true;
     let totalPausedTime = 0;
     let pauseStartTime = 0;
@@ -137,51 +138,52 @@
         ysdk.getPlayer().then(_player => {
             player = _player;
             loadProgress();
+			
+			ysdk.getPayments({ signed: true }).then(_payments => {
+				payments = _payments;
+				payments.getCatalog()
+					.then(products => {
+						productsCache = products;
+						updateShopButtons();
+					})
+					.catch(error => console.error('Ошибка загрузки каталога:', error));
+				payments.getPurchases().then(purchases => {
+					purchases.forEach(consumePurchase);
+				});
+			}).catch(error => {
+				console.error('Покупки недоступны:', error);
+			});
         }).catch(err => {
             console.error('Ошибка при инициализации объекта Player:', err);
         });
 
-        ysdk.getPayments({ signed: true }).then(_payments => {
-            payments = _payments;
-            payments.getCatalog()
-                .then(products => {
-                    productsCache = products;
-                    updateShopButtons();
-                })
-                .catch(error => console.error('Ошибка загрузки каталога:', error));
-            payments.getPurchases().then(purchases => {
-                purchases.forEach(consumePurchase);
-            });
-        }).catch(error => {
-            console.error('Покупки недоступны:', error);
-        });
 
         document.getElementById('buy-gems-button-10').addEventListener('click', async () => {
-            try {
-                const purchase = await payments.purchase({ id: 'gem10' });
-                await payments.consumePurchase(purchase.purchaseToken);
-                crystals += 10;
-                saveProgress();
-                updateUI();
-                renderSkinMenu();
-                showNotification(locales[currentLang].notificationSuccess);
-            } catch (err) {
-                showNotification(locales[currentLang].notificationCancel);
-            }
+			try {
+				const purchase = await payments.purchase({ id: 'gem10' });
+				crystals += 10;
+				saveProgress();
+				await payments.consumePurchase(purchase.purchaseToken);
+				updateUI();
+				renderSkinMenu();
+				showNotification(locales[currentLang].notificationSuccess);
+			} catch (err) {
+				showNotification(locales[currentLang].notificationCancel);
+			}
         });
 
         document.getElementById('buy-gems-button-50').addEventListener('click', async () => {
-            try {
-                const purchase = await payments.purchase({ id: 'gem50' });
-                await payments.consumePurchase(purchase.purchaseToken);
-                crystals += 50;
-                saveProgress();
-                updateUI();
-                renderSkinMenu();
-                showNotification(locales[currentLang].notificationSuccess);
-            } catch (err) {
-                showNotification(locales[currentLang].notificationCancel);
-            }
+			try {
+				const purchase = await payments.purchase({ id: 'gem50' });
+				crystals += 50;
+				saveProgress();
+				await payments.consumePurchase(purchase.purchaseToken);
+				updateUI();
+				renderSkinMenu();
+				showNotification(locales[currentLang].notificationSuccess);
+			} catch (err) {
+				showNotification(locales[currentLang].notificationCancel);
+			}
         });
 
         showAd();
@@ -467,6 +469,7 @@
 			showNotification(locales[currentLang].gameIsLoading)
 			return;
 		}
+		isStarted = true;
         menu.style.display = 'none';
         initGame();
     });
@@ -523,18 +526,24 @@
 
     function showAd() {
         if (!yandexSDK) return;
+        lastAdShownTime = Date.now();
         gamePause();
         yandexSDK.adv.showFullscreenAdv({
             callbacks: {
                 onClose: () => {
-                    gameUnPause();
+					if (!isStarted) {
+						return;
+					}
+					if (isGameOver) {
+						isGameOver = false;
+					}
+					lastAdShownTime = Date.now();
+                    initGame();
                 },
                 onError: () => {
-                    gameUnPause();
                 }
             }
         });
-        lastAdShownTime = Date.now();
     }
 
     document.getElementById('skin-button').addEventListener('click', () => {
@@ -646,7 +655,12 @@
     function restartGame() {
         score = 0;
         reviveCount = 0;
-        initGame();
+		if (Date.now() - lastAdShownTime > 60000 && yandexSDK) 
+		{
+			showAd();
+		} else {
+			initGame();
+		}
     }
 
 	function performRevive() {
@@ -659,9 +673,11 @@
 	}
 
     function initGame() {
+		if (!isStarted) {
+			return;
+		}
         pauseButton.style.display = 'block';
         cancelAnimationFrame(animationFrameId);
-        playBgMusic();
 		
         currentHealth = Math.floor(maxHealth / 2);
         submarine = { x: 50 + 350 * (currentHealth - 1) / 14, y: 300, width: 50, height: 15 };
@@ -890,9 +906,9 @@
 			document.getElementById('buy-for-revive').addEventListener('click', async () => {
 				try {
 					const purchase = await payments.purchase({ id: 'gem10' });
-					await payments.consumePurchase(purchase.purchaseToken);
 					crystals += 10;
 					saveProgress();
+					await payments.consumePurchase(purchase.purchaseToken);
 					updateUI();
 					gameOver(); // Перерисовываем меню
 					showNotification(locales[currentLang].notificationSuccess);
@@ -952,13 +968,6 @@
 		document.getElementById('restart-button').addEventListener('click', () => {
 			menu.style.display = 'none';
 			restartGame();
-			gamePause();
-			if (Date.now() - lastAdShownTime > 60000 && yandexSDK) 
-			{
-				showAd();
-			} else {
-				gameUnPause();
-			}
 		});
 
 		menu.style.display = 'block';
@@ -979,7 +988,7 @@
 		game.classList.remove('paused');
         totalPausedTime += Date.now() - pauseStartTime;
         isPaused = false;
-		if (audioContext) {
+		if (audioContext && !isGameOver && isStarted) {
 			audioContext.resume().then(() => {
 				playBgMusic(currentPlaybackTime);
 			});
