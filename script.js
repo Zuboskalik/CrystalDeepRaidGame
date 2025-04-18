@@ -1013,7 +1013,7 @@
         generateObstaclesAndFood();
         if (isUpPressed) submarine.y -= turnSpeed;
         if (isDownPressed) submarine.y += turnSpeed;
-        submarine.y = Math.max(0, Math.min(submarine.y, 600 - submarine.height));
+        submarine.y = Math.max(25, Math.min(submarine.y, 600 - submarine.height));
         obstacles.forEach(o => o.x -= speed);
         foods.forEach(f => f.x -= speed);
         movingBg.setAttribute('x', (parseFloat(movingBg.getAttribute('x')) + speed / 2) % 100);
