@@ -32,8 +32,8 @@ body {
         linear-gradient(-45deg, var(--main-bg-color) 25%, transparent 25%),
         linear-gradient(45deg, transparent 75%, var(--main-bg-color) 75%),
         linear-gradient(-45deg, transparent 75%, var(--main-bg-color) 75%);
-    background-size: 40px 40px;
-    background-position: 0 0, 0 20px, 20px -20px, -20px 0px;
+    background-size: 160px 160px;
+    background-position: 0 0, 0 80px, 80px -80px, -80px 0px;
 }
 
 #game-container {
@@ -87,7 +87,7 @@ body {
         var(--main-bg-color) 75%,
         var(--secondary-bg-color) 75%
     );
-    background-size: 40px 40px;
+    background-size: 160px 160px;
     animation: moveBg 20s linear infinite;
 }
 

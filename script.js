@@ -113,7 +113,7 @@
     ];
 
     let currentSubmarineSkin = 'default';
-    let submarine = { x: 100, y: 300, width: 50, height: 20 };
+    let submarine = { x: 100, y: 300, width: 50, height: 30 };
     let submarineGroup;
     let currentHealth = 3;
     let maxHealth = 10;
@@ -578,8 +578,8 @@
         const body = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
         body.setAttribute('x', '0');
         body.setAttribute('y', '5');
-        body.setAttribute('width', '50');
-        body.setAttribute('height', '10');
+        body.setAttribute('width', '60');
+        body.setAttribute('height', '20');
         body.setAttribute('fill', 'gray');
         group.appendChild(body);
 
@@ -587,30 +587,30 @@
         const tower = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
         tower.setAttribute('x', '10');
         tower.setAttribute('y', '0');
-        tower.setAttribute('width', '10');
-        tower.setAttribute('height', '5');
+        tower.setAttribute('width', '20');
+        tower.setAttribute('height', '10');
         tower.setAttribute('fill', 'gray');
         group.appendChild(tower);
 
         // Иллюминаторы
         const porthole1 = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
         porthole1.setAttribute('cx', '10');
-        porthole1.setAttribute('cy', '10');
-        porthole1.setAttribute('r', '2');
+        porthole1.setAttribute('cy', '15');
+        porthole1.setAttribute('r', '4');
         porthole1.setAttribute('fill', 'yellow');
         group.appendChild(porthole1);
 
         const porthole2 = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-        porthole2.setAttribute('cx', '25');
-        porthole2.setAttribute('cy', '10');
-        porthole2.setAttribute('r', '2');
+        porthole2.setAttribute('cx', '30');
+        porthole2.setAttribute('cy', '15');
+        porthole2.setAttribute('r', '4');
         porthole2.setAttribute('fill', 'lightgreen');
         group.appendChild(porthole2);
 
         const porthole3 = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-        porthole3.setAttribute('cx', '40');
-        porthole3.setAttribute('cy', '10');
-        porthole3.setAttribute('r', '2');
+        porthole3.setAttribute('cx', '50');
+        porthole3.setAttribute('cy', '15');
+        porthole3.setAttribute('r', '4');
         porthole3.setAttribute('fill', 'lightgreen');
         group.appendChild(porthole3);
 
@@ -680,7 +680,7 @@
         cancelAnimationFrame(animationFrameId);
 		
         currentHealth = Math.floor(maxHealth / 2);
-        submarine = { x: 50 + 350 * (currentHealth - 1) / 14, y: 300, width: 50, height: 15 };
+        submarine = { x: 50 + 350 * (currentHealth - 1) / 14, y: 300, width: 50, height: 30 };
         obstacles = [];
         foods = [];
         isGameOver = false;
@@ -707,8 +707,8 @@
 			obstacles.push({
 				x: 800,
 				y: y,
-				width: 30,
-				height: 30,
+				width: 50,
+				height: 50,
 				points: generateRockPoints(800 + 15, y + 15)
 			});
         }
@@ -716,13 +716,13 @@
             if (Math.random() < 0.04) {
                 foods.push({
                     x: 800,
-                    y: Math.random() * (600 - 20),
+                    y: Math.random() * (600 - 40) + 20,
                     isCrystal: true
                 });
             } else {
                 foods.push({
                     x: 800,
-                    y: Math.random() * (600 - 20),
+                    y: Math.random() * (600 - 40) + 20,
                     isCrystal: false
                 });
             }
@@ -762,7 +762,7 @@
             const triX2 = obstacle.x + 15, triY2 = obstacle.y;
             const triX3 = obstacle.x + 30, triY3 = obstacle.y + 30;
 
-            // Хитбокс лодки: прямоугольник submarine.x, submarine.y, width: 50, height: 15
+            // Хитбокс лодки: прямоугольник submarine.x, submarine.y, width: 50, height: 30
             const subLeft = submarine.x;
             const subRight = submarine.x + submarine.width;
             const subTop = submarine.y;
